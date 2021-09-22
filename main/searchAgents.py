@@ -82,7 +82,7 @@ class SearchAgent(Agent):
 
     def __init__(
         self,
-        fn="depthFirstSearch",
+        fn="bfs",
         prob="PositionSearchProblem",
         heuristic="nullHeuristic",
     ):
@@ -348,15 +348,15 @@ class CornersProblem(search.SearchProblem):
         Returns the start state (in your state space, not the full Pacman state
         space)
         """
-        "*** YOUR CODE HERE ***"
-        util.raiseNotDefined()
+        return (self.startingPosition, [])
 
     def isGoalState(self, state):
         """
         Returns whether this search state is a goal state of the problem.
         """
-        "*** YOUR CODE HERE ***"
-        util.raiseNotDefined()
+
+        return len(state[1]) == 4
+
 
     def getSuccessors(self, state):
         """
@@ -384,6 +384,16 @@ class CornersProblem(search.SearchProblem):
             #   hitsWall = self.walls[nextx][nexty]
 
             "*** YOUR CODE HERE ***"
+            x, y = state[0]
+            dx, dy = Actions.directionToVector(action)
+            nextx, nexty = int(x + dx), int(y + dy)
+            next_coord = nextx, nexty
+
+            if (not self.walls[nextx][nexty]):
+                if (next_coord in self.corners and next_coord not in state[1]):
+                    successors.append(((next_coord, state[1] + [next_coord]), action, 1))
+                else:
+                    successors.append(((next_coord, state[1]), action, 1))
 
         self._expanded += 1  # DO NOT CHANGE
         return successors
@@ -417,11 +427,32 @@ def cornersHeuristic(state, problem):
     shortest path from the state to a goal of the problem; i.e.  it should be
     admissible (as well as consistent).
     """
-    corners = problem.corners  # These are the corner coordinates
-    walls = problem.walls  # These are the walls of the maze, as a Grid (game.py)
 
-    "*** YOUR CODE HERE ***"
-    return 0  # Default to trivial solution
+    # Finds shortest path to all corners
+    def find_min_dist(node1, nodes):
+        if (len(nodes) == 0):
+            return 0
+
+        min = 9999999
+        for i in range(len(nodes)):
+            n = nodes[0]
+            nodes.remove(n)
+            dist = util.manhattanDistance(node1, n) + find_min_dist(n, nodes)
+            if (dist < min):
+                min = dist
+            nodes.append(n)
+            
+        return min
+
+    corners = problem.corners # These are the corner coordinates
+    walls = problem.walls # These are the walls of the maze, as a Grid (game.py)
+    
+    new_corners = []
+    for corner in corners:
+        if (corner not in state[1]):
+            new_corners.append(corner)
+
+    return find_min_dist(state[0], new_corners)
 
 
 class AStarCornersAgent(SearchAgent):
@@ -528,9 +559,53 @@ def foodHeuristic(state, problem):
     Subsequent calls to this heuristic can access
     problem.heuristicInfo['wallCount']
     """
+    
+
+    def find_min_dist(node1, nodes, depth):
+        if (len(nodes) == 0 or depth == 0):
+            return 0
+
+        min = 9999999
+        for i in range(len(nodes)):
+            n = nodes[0]
+            nodes.remove(n)
+            dist = util.manhattanDistance(node1, n) + find_min_dist(n, nodes, depth - 1)
+            if (dist < min):
+                min = dist
+            nodes.append(n)
+            
+        return min
+    
+    def min_dist(node1, nodes):
+        min = 99999999999
+        x, y = node1
+        for n in nodes:
+            dist = util.manhattanDistance(node1, n)
+            x_2, y_2 = n
+            mult = ((x - x_2)**2 + (y - y_2)**2)**(1/2)
+            if ((dist * mult) < min):
+                min = (dist * mult)
+        return min
+
+    def n_walls(position):
+        walls = 0
+        for direction in [
+            Directions.NORTH,
+            Directions.SOUTH,
+            Directions.EAST,
+            Directions.WEST,
+        ]:
+            x, y = position
+            dx, dy = Actions.directionToVector(direction)
+            nextx, nexty = int(x + dx), int(y + dy)
+            if problem.walls[nextx][nexty]:
+                walls += 1
+        return walls
+
     position, foodGrid = state
-    "*** YOUR CODE HERE ***"
-    return 0
+
+    return min_dist(position, foodGrid.asList())
+        
 
 
 class ClosestDotSearchAgent(SearchAgent):
